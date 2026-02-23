@@ -105,6 +105,14 @@ function partFileToLabel(partFile, mode) {
   return n ? `Phần ${n}` : (partFile || "");
 }
 
+function getNextPartFile(mode, level, currentPartFile) {
+  const parts = state.config?.[mode]?.[level];
+  if (!Array.isArray(parts)) return null;
+  const idx = parts.indexOf(currentPartFile);
+  if (idx < 0 || idx >= parts.length - 1) return null;
+  return parts[idx + 1];
+}
+
 function setDone(mode, level, partFile, done) {
   if (!state.accountId) return;
   localStorage.setItem(keyDone(state.accountId, mode, level, partFile), done ? "1" : "0");
@@ -279,7 +287,7 @@ function renderNgheBjtBook(book) {
   $("#backBjtBooks").onclick = () => renderNgheBjt();
   const box = $("#ngheBjtCds");
 
-  ["CD1", "CD2", "Section1"].forEach((cd) => {
+  ["CD1", "CD2", "Section1", "Section2", "Section3"].forEach((cd) => {
     const btn = document.createElement("button");
     btn.className = "btn btnBjtCd";
     btn.textContent = cd;
@@ -293,8 +301,8 @@ async function renderNgheBjtCD(book, cd) {
     renderNgheBjtCDFolders(book, cd);
     return;
   }
-  if (cd === "Section1") {
-    renderNgheBjtSection1Folders(book);
+  if (cd === "Section1" || cd === "Section2" || cd === "Section3") {
+    renderNgheBjtSectionFolders(book, cd);
     return;
   }
 
@@ -782,16 +790,16 @@ function renderNgheBjtCDExercise(book, cd, entries, currentIndex) {
   }
 }
 
-async function loadSection1Raw(book) {
+async function loadSectionRaw(book, sectionName) {
   const candidates = [
-    "Section1.json",
-    "Section1/Section1.json",
-    `${BJT_STUDY_BASE_PATH}/${book}/Section1/Section1.json`,
-    `${BJT_STUDY_BASE_PATH}/${book}/Section1.json`,
-    `${BJT_STUDY_BASE_PATH}/${book}/Section1-answer/Section1.json`,
-    `${book}/Section1/Section1.json`,
-    `${book}/Section1.json`,
-    `${book}/Section1-answer/Section1.json`
+    `${sectionName}.json`,
+    `${sectionName}/${sectionName}.json`,
+    `${BJT_STUDY_BASE_PATH}/${book}/${sectionName}/${sectionName}.json`,
+    `${BJT_STUDY_BASE_PATH}/${book}/${sectionName}.json`,
+    `${BJT_STUDY_BASE_PATH}/${book}/${sectionName}-answer/${sectionName}.json`,
+    `${book}/${sectionName}/${sectionName}.json`,
+    `${book}/${sectionName}.json`,
+    `${book}/${sectionName}-answer/${sectionName}.json`
   ];
 
   for (const path of candidates) {
@@ -801,10 +809,10 @@ async function loadSection1Raw(book) {
     } catch (_) {}
   }
 
-  throw new Error("Không tải được Section1.json.");
+  throw new Error(`Không tải được ${sectionName}.json.`);
 }
 
-function normalizeSection1Entries(raw) {
+function normalizeSectionEntries(raw) {
   const rows = Array.isArray(raw)
     ? raw
     : Array.isArray(raw.items)
@@ -821,10 +829,12 @@ function normalizeSection1Entries(raw) {
       const options = normalizeCd1Options(item);
       const correctIndex = resolveCd1CorrectIndex(item.correct ?? item.exac ?? item.exact ?? item.answer, options);
       const memo = pickFirstNonEmpty(item, ["memo", "explain", "explanation", "note", "reason", "comment", "analysis"]);
+      const script = pickFirstNonEmpty(item, ["script", "transcript", "text", "scrip", "html"]);
       return {
         number,
         label: `${idx + 1}番`,
         question,
+        script,
         options,
         correctIndex,
         memo,
@@ -836,11 +846,11 @@ function normalizeSection1Entries(raw) {
   return normalized.filter((x) => x.question && x.options.length === 4 && x.correctIndex >= 0);
 }
 
-async function renderNgheBjtSection1Folders(book) {
+async function renderNgheBjtSectionFolders(book, sectionName) {
   view.innerHTML = `
     <div class="card">
       <div class="cardTitleRow">
-        <h1 class="h1">Học BJT — ${book} / Section1</h1>
+        <h1 class="h1">Học BJT — ${book} / ${sectionName}</h1>
         <button class="btnSmall" id="backBjtList">← CD</button>
       </div>
       <p class="sub">Đang tải danh sách bài...</p>
@@ -852,12 +862,12 @@ async function renderNgheBjtSection1Folders(book) {
   const box = $("#section1Folders");
 
   try {
-    const raw = await loadSection1Raw(book);
-    const entries = normalizeSection1Entries(raw);
+    const raw = await loadSectionRaw(book, sectionName);
+    const entries = normalizeSectionEntries(raw);
 
     document.querySelector(".sub").textContent = entries.length
       ? "Chọn folder (番) để vào làm bài"
-      : "Không có dữ liệu hợp lệ trong Section1.json.";
+      : `Không có dữ liệu hợp lệ trong ${sectionName}.json.`;
 
     entries.forEach((entry, idx) => {
       const row = document.createElement("div");
@@ -866,15 +876,15 @@ async function renderNgheBjtSection1Folders(book) {
       const btn = document.createElement("button");
       btn.className = "btn btnBjtCd btnBjtFolderItem";
       btn.textContent = entry.label;
-      btn.onclick = () => renderNgheBjtSection1Exercise(book, entries, idx);
+      btn.onclick = () => renderNgheBjtSectionExercise(book, sectionName, entries, idx);
 
       const starBtn = document.createElement("button");
       starBtn.className = "btnSmall btnBookmark";
-      let bookmarked = isBjtCdBookmarked(book, "Section1", entry.orderNo);
+      let bookmarked = isBjtCdBookmarked(book, sectionName, entry.orderNo);
       setCd1BookmarkBtnUI(starBtn, bookmarked);
       starBtn.onclick = () => {
         bookmarked = !bookmarked;
-        setBjtCdBookmarked(book, "Section1", entry.orderNo, bookmarked);
+        setBjtCdBookmarked(book, sectionName, entry.orderNo, bookmarked);
         setCd1BookmarkBtnUI(starBtn, bookmarked);
       };
 
@@ -883,20 +893,43 @@ async function renderNgheBjtSection1Folders(book) {
       box.appendChild(row);
     });
   } catch (e) {
-    document.querySelector(".sub").textContent = "Không tải được Section1.json.";
+    document.querySelector(".sub").textContent = `Không tải được ${sectionName}.json.`;
   }
 }
 
-function renderNgheBjtSection1Exercise(book, entries, currentIndex) {
+function renderNgheBjtSectionExercise(book, sectionName, entries, currentIndex) {
   const total = Array.isArray(entries) ? entries.length : 0;
   const safeIndex = Math.min(Math.max(Number(currentIndex) || 0, 0), Math.max(total - 1, 0));
   const entry = total ? entries[safeIndex] : null;
   if (!entry) {
-    renderNgheBjtSection1Folders(book);
+    renderNgheBjtSectionFolders(book, sectionName);
     return;
   }
 
   const hasMemo = !!entry.memo;
+  const hasScript = !!entry.script;
+  const isSection3 = String(sectionName).toLowerCase() === "section3";
+  const pad2 = String(entry.orderNo || (safeIndex + 1)).padStart(2, "0");
+  const sectionLower = String(sectionName).toLowerCase();
+  const sectionImageNameCandidates = [
+    `${sectionLower}-${pad2}.png`,
+    `${sectionLower}-${pad2}.jpg`,
+    `${sectionLower}-${pad2}.jpeg`,
+    `${sectionLower}_${pad2}.png`,
+    `${sectionLower}_${pad2}.jpg`
+  ];
+  const sectionImageBaseCandidates = [
+    `${BJT_STUDY_BASE_PATH}/${book}/${sectionName}-image`,
+    `${BJT_STUDY_BASE_PATH}/${book}/${sectionName}/${sectionName}-image`,
+    `${BJT_STUDY_BASE_PATH}/${book}/Secttion3-image`,
+    `${BJT_STUDY_BASE_PATH}/${book}/${sectionName.toLowerCase()}-image`,
+    `${sectionName}-image`,
+    `${sectionName}/${sectionName}-image`,
+    "Secttion3-image",
+    `${sectionName.toLowerCase()}-image`
+  ];
+  const sectionImageSrcCandidates = buildAssetSrcCandidates(sectionImageBaseCandidates, sectionImageNameCandidates);
+  const hasSectionImage = isSection3 && sectionImageSrcCandidates.length > 0;
 
   view.innerHTML = `
     <div class="card">
@@ -911,6 +944,20 @@ function renderNgheBjtSection1Exercise(book, entries, currentIndex) {
         <div class="sectionQuestionLabel">Question</div>
         <div class="sectionQuestionText">${formatMultilineText(entry.question)}</div>
       </div>
+      ${hasSectionImage ? `
+        <div class="sectionImageWrap">
+          <img src="${sectionImageSrcCandidates[0]}" alt="${entry.label}" class="sectionImage" id="sectionImage" loading="eager" fetchpriority="high" />
+        </div>
+      ` : ""}
+      ${hasScript ? `
+        <div class="sectionQuestionBox">
+          <button class="btnSmall" id="toggleSection1Script">Hiện script</button>
+          <div id="section1ScriptWrap" class="cd1ScriptWrap" style="display:none; margin-top:10px;">
+            <div class="cd1ScriptTitle">Script</div>
+            <div class="sectionScriptHtml">${formatHtmlTextContent(entry.script)}</div>
+          </div>
+        </div>
+      ` : ""}
       <div class="grid" id="section1Choices"></div>
       <div id="section1Feedback"></div>
       <div class="row">
@@ -927,19 +974,34 @@ function renderNgheBjtSection1Exercise(book, entries, currentIndex) {
     </div>
   `;
 
-  $("#backSection1Folders").onclick = () => renderNgheBjtSection1Folders(book);
+  $("#backSection1Folders").onclick = () => renderNgheBjtSectionFolders(book, sectionName);
 
   const box = $("#section1Choices");
   const feedback = $("#section1Feedback");
   const toggleMemoBtn = $("#toggleSection1Memo");
   const memoWrap = $("#section1MemoWrap");
+  const toggleScriptBtn = $("#toggleSection1Script");
+  const scriptWrap = $("#section1ScriptWrap");
   const prevBtn = $("#prevSection1Exercise");
   const nextBtn = $("#nextSection1Exercise");
   const toggleBookmarkBtn = $("#toggleSection1Bookmark");
-  let bookmarked = isBjtCdBookmarked(book, "Section1", entry.orderNo);
+  let bookmarked = isBjtCdBookmarked(book, sectionName, entry.orderNo);
   let chosenIndex = -1;
 
   setCd1BookmarkBtnUI(toggleBookmarkBtn, bookmarked);
+
+  const sectionImg = $("#sectionImage");
+  let sectionImgTry = 0;
+  if (sectionImg) {
+    sectionImg.onerror = () => {
+      sectionImgTry += 1;
+      if (sectionImgTry < sectionImageSrcCandidates.length) {
+        sectionImg.src = sectionImageSrcCandidates[sectionImgTry];
+      } else {
+        sectionImg.style.display = "none";
+      }
+    };
+  }
 
   if (!hasMemo) {
     toggleMemoBtn.disabled = true;
@@ -951,6 +1013,14 @@ function renderNgheBjtSection1Exercise(book, entries, currentIndex) {
     memoWrap.style.display = isHidden ? "" : "none";
     toggleMemoBtn.textContent = isHidden ? "Ẩn memo" : "Hiện memo";
   };
+
+  if (toggleScriptBtn && scriptWrap) {
+    toggleScriptBtn.onclick = () => {
+      const isHidden = scriptWrap.style.display === "none";
+      scriptWrap.style.display = isHidden ? "" : "none";
+      toggleScriptBtn.textContent = isHidden ? "Ẩn script" : "Hiện script";
+    };
+  }
 
   entry.options.forEach((option, idx) => {
     const btn = document.createElement("button");
@@ -980,18 +1050,18 @@ function renderNgheBjtSection1Exercise(book, entries, currentIndex) {
 
   if (prevBtn) {
     prevBtn.onclick = () => {
-      if (safeIndex > 0) renderNgheBjtSection1Exercise(book, entries, safeIndex - 1);
+      if (safeIndex > 0) renderNgheBjtSectionExercise(book, sectionName, entries, safeIndex - 1);
     };
   }
   if (nextBtn) {
     nextBtn.onclick = () => {
-      if (safeIndex < total - 1) renderNgheBjtSection1Exercise(book, entries, safeIndex + 1);
+      if (safeIndex < total - 1) renderNgheBjtSectionExercise(book, sectionName, entries, safeIndex + 1);
     };
   }
   if (toggleBookmarkBtn) {
     toggleBookmarkBtn.onclick = () => {
       bookmarked = !bookmarked;
-      setBjtCdBookmarked(book, "Section1", entry.orderNo, bookmarked);
+      setBjtCdBookmarked(book, sectionName, entry.orderNo, bookmarked);
       setCd1BookmarkBtnUI(toggleBookmarkBtn, bookmarked);
     };
   }
@@ -1246,28 +1316,31 @@ function onAnswer(isCorrect, chosenIndex, correctIndex) {
       } else {
         renderQuestion();
       }
-    }, state.mode === "kanji" ? 1000 : 1500);
+    }, state.mode === "kanji" ? 1000 : 2000);
   } else {
     renderQuestion({ ok: false, chosenIndex, correctIndex });
   }
 }
 
 function renderFinish() {
+  const nextPartFile = getNextPartFile(state.mode, state.level, state.partFile);
+
   view.innerHTML = `
     <div class="card">
       <h1 class="h1">🎉 Hoàn thành phần!</h1>
       <p class="sub">${state.mode === "vocab" ? "Từ vựng" : "Chữ Hán"} / ${state.level} / ${partFileToLabel(state.partFile, state.mode)}</p>
       <div class="row">
-        <button class="btnSmall" id="again">Chơi lại phần này</button>
         <button class="btnSmall" id="toList">Về danh sách phần</button>
-        <button class="btnSmall" id="toLevels">Về chọn cấp</button>
+        <button class="btnSmall" id="nextPart" ${nextPartFile ? "" : "disabled"}>Next →</button>
       </div>
     </div>
   `;
 
-  $("#again").onclick = () => startGame(state.mode, state.level, state.partFile);
   $("#toList").onclick = () => renderParts(state.mode, state.level);
-  $("#toLevels").onclick = () => renderLevels(state.mode);
+  const nextBtn = $("#nextPart");
+  if (nextBtn && nextPartFile) {
+    nextBtn.onclick = () => startGame(state.mode, state.level, nextPartFile);
+  }
 }
 
 function escapeHtml(s) {
@@ -1282,6 +1355,10 @@ function escapeHtml(s) {
 function formatMultilineText(s) {
   const escaped = escapeHtml(String(s ?? ""));
   return escaped.replace(/(\r\n|\n|\r|\\n|\/n)/g, "<br>");
+}
+
+function formatHtmlTextContent(s) {
+  return formatMultilineText(String(s ?? ""));
 }
 
 // ===== Boot =====
