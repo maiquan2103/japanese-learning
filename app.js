@@ -13,63 +13,87 @@ function shuffle(arr) {
 }
 
 const STORAGE_KEY_ACCOUNT = "kanji-quiz:currentAccount";
+const STORAGE_KEY_BJT_CD_BOOKMARK = "kanji-quiz:bjt-cd:bookmark";
 const DONE_CONFIG_PATH = "done-config.json";
 const DATA_BASE_URL = "https://raw.githubusercontent.com/maiquan2103/Japanese-file/refs/heads/master";
 const BJT_STUDY_BASE_PATH = `${DATA_BASE_URL}/bjt-study`;
-const CD1_ANSWER_CANDIDATE_FILES = ["CD1-answer.json", "list.json", "answers.json", "answer.json", "data.json"];
+const CD_ANSWER_FALLBACK_FILES = ["list.json", "answers.json", "answer.json", "data.json"];
 
-function getCd1AnswerBaseCandidatePaths(book) {
+function getCdAnswerBaseCandidatePaths(book, cd) {
   return [
-    `${BJT_STUDY_BASE_PATH}/${book}/CD1-answer`,
-    `${BJT_STUDY_BASE_PATH}/${book}/CD1/CD1-answer`,
-    `${book}/CD1-answer`,
-    `${book}/CD1/CD1-answer`,
-    `bjt-study/${book}/CD1-answer`,
-    `bjt-study/${book}/CD1/CD1-answer`,
-    "CD1-answer",
-    "CD1/CD1-answer"
+    `${BJT_STUDY_BASE_PATH}/${book}/${cd}-answer`,
+    `${BJT_STUDY_BASE_PATH}/${book}/${cd}/${cd}-answer`,
+    `${book}/${cd}-answer`,
+    `${book}/${cd}/${cd}-answer`,
+    `bjt-study/${book}/${cd}-answer`,
+    `bjt-study/${book}/${cd}/${cd}-answer`,
+    `${cd}-answer`,
+    `${cd}/${cd}-answer`
   ];
 }
 
-function getCd1ImageBaseCandidatePaths(book, answerBasePath) {
-  const fromAnswer = answerBasePath ? [answerBasePath.replace(/\/CD1-answer$/, "/CD1-image")] : [];
+function getCdImageBaseCandidatePaths(book, cd, answerBasePath) {
+  const answerSuffix = new RegExp(`/${cd}-answer$`);
+  const fromAnswer = answerBasePath ? [answerBasePath.replace(answerSuffix, `/${cd}-image`)] : [];
   return [
     ...fromAnswer,
-    `${BJT_STUDY_BASE_PATH}/${book}/CD1-image`,
-    `${BJT_STUDY_BASE_PATH}/${book}/CD1/CD1-image`,
-    `${book}/CD1-image`,
-    `${book}/CD1/CD1-image`,
-    `bjt-study/${book}/CD1-image`,
-    `bjt-study/${book}/CD1/CD1-image`,
-    "CD1-image",
-    "CD1/CD1-image"
+    `${BJT_STUDY_BASE_PATH}/${book}/${cd}-image`,
+    `${BJT_STUDY_BASE_PATH}/${book}/${cd}/${cd}-image`,
+    `${book}/${cd}-image`,
+    `${book}/${cd}/${cd}-image`,
+    `bjt-study/${book}/${cd}-image`,
+    `bjt-study/${book}/${cd}/${cd}-image`,
+    `${cd}-image`,
+    `${cd}/${cd}-image`
   ];
 }
 
-function getCd1AudioBaseCandidatePaths(book, answerBasePath) {
+function getCdAudioBaseCandidatePaths(book, cd, answerBasePath) {
+  const answerSuffix = new RegExp(`/${cd}-answer$`);
   const fromAnswer = answerBasePath ? [
-    answerBasePath.replace(/\/CD1-answer$/, "/CD1-audio"),
-    answerBasePath.replace(/\/CD1-answer$/, "/CD1")
+    answerBasePath.replace(answerSuffix, `/${cd}-audio`),
+    answerBasePath.replace(answerSuffix, `/${cd}`)
   ] : [];
   return [
     ...fromAnswer,
-    `${BJT_STUDY_BASE_PATH}/${book}/CD1-audio`,
-    `${BJT_STUDY_BASE_PATH}/${book}/CD1/CD1-audio`,
-    `${BJT_STUDY_BASE_PATH}/${book}/CD1`,
-    `${book}/CD1-audio`,
-    `${book}/CD1/CD1-audio`,
-    `${book}/CD1`,
-    `bjt-study/${book}/CD1-audio`,
-    `bjt-study/${book}/CD1/CD1-audio`,
-    `bjt-study/${book}/CD1`,
-    "CD1-audio",
-    "CD1/CD1-audio",
-    "CD1"
+    `${BJT_STUDY_BASE_PATH}/${book}/${cd}-audio`,
+    `${BJT_STUDY_BASE_PATH}/${book}/${cd}/${cd}-audio`,
+    `${BJT_STUDY_BASE_PATH}/${book}/${cd}`,
+    `${book}/${cd}-audio`,
+    `${book}/${cd}/${cd}-audio`,
+    `${book}/${cd}`,
+    `bjt-study/${book}/${cd}-audio`,
+    `bjt-study/${book}/${cd}/${cd}-audio`,
+    `bjt-study/${book}/${cd}`,
+    `${cd}-audio`,
+    `${cd}/${cd}-audio`,
+    `${cd}`
   ];
 }
 
 function keyDone(accountId, mode, level, partFile) {
   return `done:${accountId}:${mode}:${level}:${partFile}`;
+}
+
+function keyBjtCdBookmark(accountId, book, cd, orderNo) {
+  return `${STORAGE_KEY_BJT_CD_BOOKMARK}:${accountId || "guest"}:${book}:${cd}:${orderNo}`;
+}
+
+function isBjtCdBookmarked(book, cd, orderNo) {
+  return localStorage.getItem(keyBjtCdBookmark(state.accountId, book, cd, orderNo)) === "1";
+}
+
+function setBjtCdBookmarked(book, cd, orderNo, bookmarked) {
+  localStorage.setItem(keyBjtCdBookmark(state.accountId, book, cd, orderNo), bookmarked ? "1" : "0");
+}
+
+function setCd1BookmarkBtnUI(btn, bookmarked) {
+  if (!btn) return;
+  btn.textContent = bookmarked ? "★" : "☆";
+  btn.title = bookmarked ? "Bo danh dau bai nay" : "Danh dau bai nay";
+  btn.setAttribute("aria-label", btn.title);
+  btn.setAttribute("aria-pressed", bookmarked ? "true" : "false");
+  btn.classList.toggle("isActive", bookmarked);
 }
 
 function partFileToLabel(partFile, mode) {
@@ -265,8 +289,8 @@ function renderNgheBjtBook(book) {
 }
 
 async function renderNgheBjtCD(book, cd) {
-  if (cd === "CD1") {
-    renderNgheBjtCD1Folders(book);
+  if (cd === "CD1" || cd === "CD2") {
+    renderNgheBjtCDFolders(book, cd);
     return;
   }
 
@@ -315,24 +339,28 @@ async function renderNgheBjtCD(book, cd) {
   }
 }
 
-async function loadCd1AnswerRaw(book) {
-  for (const answerBasePath of getCd1AnswerBaseCandidatePaths(book)) {
-    for (const name of CD1_ANSWER_CANDIDATE_FILES) {
+function getCdAnswerCandidateFiles(cd) {
+  return [`${cd}-answer.json`, ...CD_ANSWER_FALLBACK_FILES];
+}
+
+async function loadCdAnswerRaw(book, cd) {
+  for (const answerBasePath of getCdAnswerBaseCandidatePaths(book, cd)) {
+    for (const name of getCdAnswerCandidateFiles(cd)) {
       try {
         const raw = await loadJSON(`${answerBasePath}/${name}`);
         return {
           raw,
-          imageBasePaths: getCd1ImageBaseCandidatePaths(book, answerBasePath),
-          audioBasePaths: getCd1AudioBaseCandidatePaths(book, answerBasePath)
+          imageBasePaths: getCdImageBaseCandidatePaths(book, cd, answerBasePath),
+          audioBasePaths: getCdAudioBaseCandidatePaths(book, cd, answerBasePath)
         };
       } catch (_) {}
     }
   }
 
-  throw new Error("Không tải được file đáp án CD1.");
+  throw new Error(`Không tải được file đáp án ${cd}.`);
 }
 
-function parseCd1Number(value) {
+function parseCdNumber(value) {
   if (value == null) return null;
   if (typeof value === "number" && Number.isFinite(value)) return value;
 
@@ -379,13 +407,13 @@ function buildAssetSrcCandidates(basePaths, fileNames) {
   return withUniqueValues([...joined, ...direct]);
 }
 
-function buildCd1ImageFileCandidates(imageFileRaw, number) {
+function buildCdImageFileCandidates(imageFileRaw, number, cd) {
   const raw = String(imageFileRaw ?? "").trim();
   const noExt = raw.replace(/\.[^./\\]+$/, "");
   const pad2 = String(number).padStart(2, "0");
 
   const extCandidates = [".png", ".jpg", ".jpeg", ".webp"];
-  const baseCandidates = [raw, noExt, String(number), pad2, `CD1-${number}`, `CD1-${pad2}`, `CD1_${number}`, `CD1_${pad2}`];
+  const baseCandidates = [raw, noExt, String(number), pad2, `${cd}-${number}`, `${cd}-${pad2}`, `${cd}_${number}`, `${cd}_${pad2}`];
 
   const names = [];
   baseCandidates.forEach((base) => {
@@ -399,7 +427,7 @@ function buildCd1ImageFileCandidates(imageFileRaw, number) {
   return withUniqueValues(names);
 }
 
-function buildCd1AudioFileCandidates(audioFileRaw, number) {
+function buildCdAudioFileCandidates(audioFileRaw, number, cd) {
   const raw = String(audioFileRaw ?? "").trim();
   const noExt = raw.replace(/\.[^./\\]+$/, "");
   const pad2 = String(number).padStart(2, "0");
@@ -407,8 +435,8 @@ function buildCd1AudioFileCandidates(audioFileRaw, number) {
   const extCandidates = [".mp3", ".m4a", ".wav", ".ogg"];
   const baseCandidates = [
     raw, noExt, String(number), pad2,
-    `CD1-${number}`, `CD1-${pad2}`, `CD1_${number}`, `CD1_${pad2}`,
-    `BJTchokai_CD1-${number}`, `BJTchokai_CD1-${pad2}`, `BJTchokai_CD1_${number}`, `BJTchokai_CD1_${pad2}`
+    `${cd}-${number}`, `${cd}-${pad2}`, `${cd}_${number}`, `${cd}_${pad2}`,
+    `BJTchokai_${cd}-${number}`, `BJTchokai_${cd}-${pad2}`, `BJTchokai_${cd}_${number}`, `BJTchokai_${cd}_${pad2}`
   ];
 
   const names = [];
@@ -462,7 +490,7 @@ function resolveCd1CorrectIndex(rawCorrect, options) {
   const upper = s.toUpperCase();
   if (["A", "B", "C", "D"].includes(upper)) return "ABCD".indexOf(upper);
 
-  const num = parseCd1Number(s);
+  const num = parseCdNumber(s);
   if (num != null) {
     if (num >= 1 && num <= options.length) return num - 1;
     if (num >= 0 && num < options.length) return num;
@@ -482,8 +510,8 @@ function pickFirstNonEmpty(item, keys) {
   return "";
 }
 
-function normalizeCd1Entry(item, idx, imageBasePaths, audioBasePaths) {
-  const number = parseCd1Number(item.ban ?? item.number ?? item.no ?? item.id ?? item.index ?? item.name) ?? (idx + 1);
+function normalizeCd1Entry(item, idx, imageBasePaths, audioBasePaths, cd) {
+  const number = parseCdNumber(item.ban ?? item.number ?? item.no ?? item.id ?? item.index ?? item.name) ?? (idx + 1);
   const imageFile = String(
     item.image ?? item.img ?? item.file ?? item.filename ?? item.photo ?? item.picture ?? `${number}.png`
   );
@@ -493,8 +521,8 @@ function normalizeCd1Entry(item, idx, imageBasePaths, audioBasePaths) {
   const options = normalizeCd1Options(item);
   const rawCorrect = item.exac ?? item.exact ?? item.correct ?? item.answer;
   const correctIndex = resolveCd1CorrectIndex(rawCorrect, options);
-  const imageFileCandidates = buildCd1ImageFileCandidates(imageFile, number);
-  const audioFileCandidates = buildCd1AudioFileCandidates(audioFile, number);
+  const imageFileCandidates = buildCdImageFileCandidates(imageFile, number, cd);
+  const audioFileCandidates = buildCdAudioFileCandidates(audioFile, number, cd);
   const imageSrcCandidates = buildAssetSrcCandidates(imageBasePaths, imageFileCandidates);
   const audioSrcCandidates = buildAssetSrcCandidates(audioBasePaths, audioFileCandidates);
 
@@ -522,7 +550,7 @@ function normalizeCd1Entry(item, idx, imageBasePaths, audioBasePaths) {
   };
 }
 
-function normalizeCd1Entries(raw, imageBasePaths, audioBasePaths) {
+function normalizeCd1Entries(raw, imageBasePaths, audioBasePaths, cd) {
   const rows = Array.isArray(raw)
     ? raw
     : Array.isArray(raw.items)
@@ -533,17 +561,17 @@ function normalizeCd1Entries(raw, imageBasePaths, audioBasePaths) {
 
   const normalized = rows
     .filter((x) => x && typeof x === "object")
-    .map((x, idx) => normalizeCd1Entry(x, idx, imageBasePaths, audioBasePaths))
+    .map((x, idx) => normalizeCd1Entry(x, idx, imageBasePaths, audioBasePaths, cd))
     .sort((a, b) => a.number - b.number);
 
   return normalized.filter((x) => x.options.length === 4 && x.correctIndex >= 0);
 }
 
-async function renderNgheBjtCD1Folders(book) {
+async function renderNgheBjtCDFolders(book, cd) {
   view.innerHTML = `
     <div class="card">
       <div class="cardTitleRow">
-        <h1 class="h1">Học BJT — ${book} / CD1</h1>
+        <h1 class="h1">Học BJT — ${book} / ${cd}</h1>
         <button class="btnSmall" id="backBjtList">← CD</button>
       </div>
       <p class="sub">Đang tải danh sách bài...</p>
@@ -555,41 +583,64 @@ async function renderNgheBjtCD1Folders(book) {
   const box = $("#cd1Folders");
 
   try {
-    const loaded = await loadCd1AnswerRaw(book);
-    const entries = normalizeCd1Entries(loaded.raw, loaded.imageBasePaths, loaded.audioBasePaths);
+    const loaded = await loadCdAnswerRaw(book, cd);
+    const entries = normalizeCd1Entries(loaded.raw, loaded.imageBasePaths, loaded.audioBasePaths, cd);
     entries.forEach((entry, idx) => {
       entry.orderNo = idx + 1;
       entry.label = `${idx + 1}番`;
       const pad2 = String(entry.orderNo).padStart(2, "0");
       const primaryImages = [
-        `${BJT_STUDY_BASE_PATH}/${book}/CD1-image/${pad2}.png`,
-        `${BJT_STUDY_BASE_PATH}/${book}/CD1-image/CD1-${pad2}.png`,
-        `${BJT_STUDY_BASE_PATH}/${book}/CD1-image/BJTchokai_CD1-${pad2}.png`
+        `${BJT_STUDY_BASE_PATH}/${book}/${cd}-image/${pad2}.png`,
+        `${BJT_STUDY_BASE_PATH}/${book}/${cd}-image/${cd}-${pad2}.png`,
+        `${BJT_STUDY_BASE_PATH}/${book}/${cd}-image/BJTchokai_${cd}-${pad2}.png`
       ];
       entry.imageSrcCandidates = withUniqueValues([...primaryImages, ...(entry.imageSrcCandidates || [])]).slice(0, 8);
       entry.imageSrc = entry.imageSrcCandidates[0] || "";
-      const primaryAudio = `${BJT_STUDY_BASE_PATH}/${book}/CD1/BJTchokai_CD1-${pad2}.mp3`;
+      const primaryAudio = `${BJT_STUDY_BASE_PATH}/${book}/${cd}/BJTchokai_${cd}-${pad2}.mp3`;
       entry.audioSrcCandidates = withUniqueValues([primaryAudio, ...(entry.audioSrcCandidates || [])]);
       entry.audioSrc = entry.audioSrcCandidates[0] || "";
     });
 
     document.querySelector(".sub").textContent = entries.length
       ? "Chọn folder (番) để vào làm bài"
-      : "Không có dữ liệu hợp lệ trong CD1-answer (cần 4 đáp án và trường exac/exact).";
+      : `Không có dữ liệu hợp lệ trong ${cd}-answer (cần 4 đáp án và trường exac/exact).`;
 
-    entries.forEach((entry) => {
+    entries.forEach((entry, idx) => {
+      const row = document.createElement("div");
+      row.className = "cd1FolderRow";
+
       const btn = document.createElement("button");
       btn.className = "btn btnBjtCd";
       btn.textContent = entry.label;
-      btn.onclick = () => renderNgheBjtCD1Exercise(book, entry);
-      box.appendChild(btn);
+      btn.onclick = () => renderNgheBjtCDExercise(book, cd, entries, idx);
+
+      const starBtn = document.createElement("button");
+      starBtn.className = "btnSmall btnBookmark";
+      let bookmarked = isBjtCdBookmarked(book, cd, entry.orderNo);
+      setCd1BookmarkBtnUI(starBtn, bookmarked);
+      starBtn.onclick = () => {
+        bookmarked = !bookmarked;
+        setBjtCdBookmarked(book, cd, entry.orderNo, bookmarked);
+        setCd1BookmarkBtnUI(starBtn, bookmarked);
+      };
+
+      row.appendChild(btn);
+      row.appendChild(starBtn);
+      box.appendChild(row);
     });
   } catch (e) {
-    document.querySelector(".sub").textContent = "Không tải được CD1-answer. Kiểm tra folder CD1/CD1-answer và file json.";
+    document.querySelector(".sub").textContent = `Không tải được ${cd}-answer. Kiểm tra folder ${cd}/${cd}-answer và file json.`;
   }
 }
 
-function renderNgheBjtCD1Exercise(book, entry) {
+function renderNgheBjtCDExercise(book, cd, entries, currentIndex) {
+  const total = Array.isArray(entries) ? entries.length : 0;
+  const safeIndex = Math.min(Math.max(Number(currentIndex) || 0, 0), Math.max(total - 1, 0));
+  const entry = total ? entries[safeIndex] : null;
+  if (!entry) {
+    renderNgheBjtCDFolders(book, cd);
+    return;
+  }
   const correctOptionText = entry.correctIndex >= 0 ? (entry.options[entry.correctIndex] || "") : "";
   const explanationText = entry.explanation || "Chưa có giải thích.";
   const hasScriptDetail = !!(entry.script || entry.questionText || correctOptionText || entry.explanation);
@@ -597,10 +648,12 @@ function renderNgheBjtCD1Exercise(book, entry) {
   view.innerHTML = `
     <div class="card">
       <div class="cardTitleRow">
-        <h1 class="h1">Học BJT — ${book} / CD1 / ${entry.label}</h1>
-        <button class="btnSmall" id="backCd1Folders">← Folder</button>
+        <h1 class="h1">${entry.label}</h1>
+        <div class="cardTitleActions">
+          <button class="btnSmall" id="backCd1Folders">← Folder</button>
+          <button class="btnSmall btnBookmark" id="toggleCd1Bookmark" aria-pressed="false">☆</button>
+        </div>
       </div>
-      <p class="sub">Chọn 1 đáp án đúng</p>
       <div class="cd1ImageWrap">
         <img src="${entry.imageSrc}" alt="${entry.label}" class="cd1Image" id="cd1Image" loading="eager" fetchpriority="high" />
       </div>
@@ -622,10 +675,14 @@ function renderNgheBjtCD1Exercise(book, entry) {
           <div><strong>Giải thích:</strong> ${formatMultilineText(explanationText)}</div>
         </div>
       </div>
+      <div class="row" style="margin-top:12px; justify-content:space-between; gap:8px;">
+        <button class="btnSmall" id="prevCd1Exercise" ${safeIndex <= 0 ? "disabled" : ""}>← Back</button>
+        <button class="btnSmall" id="nextCd1Exercise" ${safeIndex >= total - 1 ? "disabled" : ""}>Next →</button>
+      </div>
     </div>
   `;
 
-  $("#backCd1Folders").onclick = () => renderNgheBjtCD1Folders(book);
+  $("#backCd1Folders").onclick = () => renderNgheBjtCDFolders(book, cd);
 
   const img = $("#cd1Image");
   let imageTry = 0;
@@ -638,7 +695,7 @@ function renderNgheBjtCD1Exercise(book, entry) {
 
   const audio = $("#cd1Audio");
   const orderNo = Number(entry.orderNo) || 1;
-  const orderAudioNames = buildCd1AudioFileCandidates(`${orderNo}.mp3`, orderNo);
+  const orderAudioNames = buildCdAudioFileCandidates(`${orderNo}.mp3`, orderNo, cd);
   const orderAudioSrcCandidates = buildAssetSrcCandidates(entry.audioBasePaths || [], orderAudioNames);
   const allAudioCandidates = withUniqueValues([...(entry.audioSrcCandidates || []), ...orderAudioSrcCandidates]).slice(0, 10);
   if (audio && !audio.getAttribute("src") && allAudioCandidates.length) {
@@ -660,7 +717,13 @@ function renderNgheBjtCD1Exercise(book, entry) {
   const feedback = $("#cd1Feedback");
   const toggleScriptBtn = $("#toggleCd1Script");
   const scriptWrap = $("#cd1ScriptWrap");
+  const prevBtn = $("#prevCd1Exercise");
+  const nextBtn = $("#nextCd1Exercise");
+  const toggleBookmarkBtn = $("#toggleCd1Bookmark");
+  let bookmarked = isBjtCdBookmarked(book, cd, entry.orderNo);
   let chosenIndex = -1;
+
+  setCd1BookmarkBtnUI(toggleBookmarkBtn, bookmarked);
 
   if (!hasScriptDetail) {
     toggleScriptBtn.disabled = true;
@@ -695,6 +758,24 @@ function renderNgheBjtCD1Exercise(book, entry) {
     };
     box.appendChild(btn);
   });
+
+  if (prevBtn) {
+    prevBtn.onclick = () => {
+      if (safeIndex > 0) renderNgheBjtCDExercise(book, cd, entries, safeIndex - 1);
+    };
+  }
+  if (nextBtn) {
+    nextBtn.onclick = () => {
+      if (safeIndex < total - 1) renderNgheBjtCDExercise(book, cd, entries, safeIndex + 1);
+    };
+  }
+  if (toggleBookmarkBtn) {
+    toggleBookmarkBtn.onclick = () => {
+      bookmarked = !bookmarked;
+      setBjtCdBookmarked(book, cd, entry.orderNo, bookmarked);
+      setCd1BookmarkBtnUI(toggleBookmarkBtn, bookmarked);
+    };
+  }
 }
 
 function renderLevels(mode) {
