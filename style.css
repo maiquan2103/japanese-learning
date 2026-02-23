@@ -252,3 +252,20 @@ body { margin: 0; background: #0b0e14; color: #e7eaf0; }
   font-size: 14px;
   opacity: .92;
 }
+.sectionQuestionBox {
+  margin: 8px 0 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #2a3550;
+  background: #0f1422;
+}
+.sectionQuestionLabel {
+  font-size: 13px;
+  opacity: .8;
+  margin-bottom: 6px;
+}
+.sectionQuestionText {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.45;
+}

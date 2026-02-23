@@ -279,7 +279,7 @@ function renderNgheBjtBook(book) {
   $("#backBjtBooks").onclick = () => renderNgheBjt();
   const box = $("#ngheBjtCds");
 
-  ["CD1", "CD2"].forEach((cd) => {
+  ["CD1", "CD2", "Section1"].forEach((cd) => {
     const btn = document.createElement("button");
     btn.className = "btn btnBjtCd";
     btn.textContent = cd;
@@ -291,6 +291,10 @@ function renderNgheBjtBook(book) {
 async function renderNgheBjtCD(book, cd) {
   if (cd === "CD1" || cd === "CD2") {
     renderNgheBjtCDFolders(book, cd);
+    return;
+  }
+  if (cd === "Section1") {
+    renderNgheBjtSection1Folders(book);
     return;
   }
 
@@ -773,6 +777,221 @@ function renderNgheBjtCDExercise(book, cd, entries, currentIndex) {
     toggleBookmarkBtn.onclick = () => {
       bookmarked = !bookmarked;
       setBjtCdBookmarked(book, cd, entry.orderNo, bookmarked);
+      setCd1BookmarkBtnUI(toggleBookmarkBtn, bookmarked);
+    };
+  }
+}
+
+async function loadSection1Raw(book) {
+  const candidates = [
+    "Section1.json",
+    "Section1/Section1.json",
+    `${BJT_STUDY_BASE_PATH}/${book}/Section1/Section1.json`,
+    `${BJT_STUDY_BASE_PATH}/${book}/Section1.json`,
+    `${BJT_STUDY_BASE_PATH}/${book}/Section1-answer/Section1.json`,
+    `${book}/Section1/Section1.json`,
+    `${book}/Section1.json`,
+    `${book}/Section1-answer/Section1.json`
+  ];
+
+  for (const path of candidates) {
+    try {
+      const raw = await loadJSON(path);
+      return raw;
+    } catch (_) {}
+  }
+
+  throw new Error("Không tải được Section1.json.");
+}
+
+function normalizeSection1Entries(raw) {
+  const rows = Array.isArray(raw)
+    ? raw
+    : Array.isArray(raw.items)
+      ? raw.items
+      : Array.isArray(raw.data)
+        ? raw.data
+        : Object.values(raw || {});
+
+  const normalized = rows
+    .filter((x) => x && typeof x === "object")
+    .map((item, idx) => {
+      const number = parseCdNumber(item.id ?? item.no ?? item.number ?? item.index ?? item.name) ?? (idx + 1);
+      const question = pickFirstNonEmpty(item, ["question", "q", "mondai", "problem"]);
+      const options = normalizeCd1Options(item);
+      const correctIndex = resolveCd1CorrectIndex(item.correct ?? item.exac ?? item.exact ?? item.answer, options);
+      const memo = pickFirstNonEmpty(item, ["memo", "explain", "explanation", "note", "reason", "comment", "analysis"]);
+      return {
+        number,
+        label: `${idx + 1}番`,
+        question,
+        options,
+        correctIndex,
+        memo,
+        orderNo: idx + 1
+      };
+    })
+    .sort((a, b) => a.number - b.number);
+
+  return normalized.filter((x) => x.question && x.options.length === 4 && x.correctIndex >= 0);
+}
+
+async function renderNgheBjtSection1Folders(book) {
+  view.innerHTML = `
+    <div class="card">
+      <div class="cardTitleRow">
+        <h1 class="h1">Học BJT — ${book} / Section1</h1>
+        <button class="btnSmall" id="backBjtList">← CD</button>
+      </div>
+      <p class="sub">Đang tải danh sách bài...</p>
+      <div class="grid grid2" id="section1Folders"></div>
+    </div>
+  `;
+
+  $("#backBjtList").onclick = () => renderNgheBjtBook(book);
+  const box = $("#section1Folders");
+
+  try {
+    const raw = await loadSection1Raw(book);
+    const entries = normalizeSection1Entries(raw);
+
+    document.querySelector(".sub").textContent = entries.length
+      ? "Chọn folder (番) để vào làm bài"
+      : "Không có dữ liệu hợp lệ trong Section1.json.";
+
+    entries.forEach((entry, idx) => {
+      const row = document.createElement("div");
+      row.className = "cd1FolderRow";
+
+      const btn = document.createElement("button");
+      btn.className = "btn btnBjtCd btnBjtFolderItem";
+      btn.textContent = entry.label;
+      btn.onclick = () => renderNgheBjtSection1Exercise(book, entries, idx);
+
+      const starBtn = document.createElement("button");
+      starBtn.className = "btnSmall btnBookmark";
+      let bookmarked = isBjtCdBookmarked(book, "Section1", entry.orderNo);
+      setCd1BookmarkBtnUI(starBtn, bookmarked);
+      starBtn.onclick = () => {
+        bookmarked = !bookmarked;
+        setBjtCdBookmarked(book, "Section1", entry.orderNo, bookmarked);
+        setCd1BookmarkBtnUI(starBtn, bookmarked);
+      };
+
+      row.appendChild(btn);
+      row.appendChild(starBtn);
+      box.appendChild(row);
+    });
+  } catch (e) {
+    document.querySelector(".sub").textContent = "Không tải được Section1.json.";
+  }
+}
+
+function renderNgheBjtSection1Exercise(book, entries, currentIndex) {
+  const total = Array.isArray(entries) ? entries.length : 0;
+  const safeIndex = Math.min(Math.max(Number(currentIndex) || 0, 0), Math.max(total - 1, 0));
+  const entry = total ? entries[safeIndex] : null;
+  if (!entry) {
+    renderNgheBjtSection1Folders(book);
+    return;
+  }
+
+  const hasMemo = !!entry.memo;
+
+  view.innerHTML = `
+    <div class="card">
+      <div class="cardTitleRow">
+        <h1 class="h1">${entry.label}</h1>
+        <div class="cardTitleActions">
+          <button class="btnSmall" id="backSection1Folders">← Folder</button>
+          <button class="btnSmall btnBookmark" id="toggleSection1Bookmark" aria-pressed="false">☆</button>
+        </div>
+      </div>
+      <div class="sectionQuestionBox">
+        <div class="sectionQuestionLabel">Question</div>
+        <div class="sectionQuestionText">${formatMultilineText(entry.question)}</div>
+      </div>
+      <div class="grid" id="section1Choices"></div>
+      <div id="section1Feedback"></div>
+      <div class="row">
+        <button class="btnSmall" id="toggleSection1Memo">${hasMemo ? "Hiện memo" : "Không có memo"}</button>
+      </div>
+      <div id="section1MemoWrap" class="cd1ScriptWrap" style="display:none;">
+        <div class="cd1ScriptTitle">Memo</div>
+        <div class="cd1ScriptList">${hasMemo ? formatMultilineText(entry.memo) : ""}</div>
+      </div>
+      <div class="row" style="margin-top:12px; justify-content:space-between; gap:8px;">
+        <button class="btnSmall" id="prevSection1Exercise" ${safeIndex <= 0 ? "disabled" : ""}>← Back</button>
+        <button class="btnSmall" id="nextSection1Exercise" ${safeIndex >= total - 1 ? "disabled" : ""}>Next →</button>
+      </div>
+    </div>
+  `;
+
+  $("#backSection1Folders").onclick = () => renderNgheBjtSection1Folders(book);
+
+  const box = $("#section1Choices");
+  const feedback = $("#section1Feedback");
+  const toggleMemoBtn = $("#toggleSection1Memo");
+  const memoWrap = $("#section1MemoWrap");
+  const prevBtn = $("#prevSection1Exercise");
+  const nextBtn = $("#nextSection1Exercise");
+  const toggleBookmarkBtn = $("#toggleSection1Bookmark");
+  let bookmarked = isBjtCdBookmarked(book, "Section1", entry.orderNo);
+  let chosenIndex = -1;
+
+  setCd1BookmarkBtnUI(toggleBookmarkBtn, bookmarked);
+
+  if (!hasMemo) {
+    toggleMemoBtn.disabled = true;
+  }
+
+  toggleMemoBtn.onclick = () => {
+    if (!hasMemo) return;
+    const isHidden = memoWrap.style.display === "none";
+    memoWrap.style.display = isHidden ? "" : "none";
+    toggleMemoBtn.textContent = isHidden ? "Ẩn memo" : "Hiện memo";
+  };
+
+  entry.options.forEach((option, idx) => {
+    const btn = document.createElement("button");
+    btn.className = "btn";
+    btn.innerHTML = `
+      <div class="choiceLine1">${idx + 1}. ${escapeHtml(option)}</div>
+    `;
+    btn.onclick = () => {
+      chosenIndex = idx;
+      const all = box.querySelectorAll(".btn");
+      all.forEach((el, i) => {
+        el.classList.remove("choiceCorrect", "choiceWrong");
+        if (i === entry.correctIndex) el.classList.add("choiceCorrect");
+        if (i === chosenIndex && i !== entry.correctIndex) el.classList.add("choiceWrong");
+      });
+
+      const ok = idx === entry.correctIndex;
+      feedback.innerHTML = `
+        <div class="feedback ${ok ? "ok" : "ng"}">
+          <div class="choiceLine1">${ok ? "Chính xác!" : "Sai rồi, thử lại nhé."}</div>
+          <div class="choiceLine2">Đáp án đúng: ${escapeHtml(entry.options[entry.correctIndex] || "")}</div>
+        </div>
+      `;
+    };
+    box.appendChild(btn);
+  });
+
+  if (prevBtn) {
+    prevBtn.onclick = () => {
+      if (safeIndex > 0) renderNgheBjtSection1Exercise(book, entries, safeIndex - 1);
+    };
+  }
+  if (nextBtn) {
+    nextBtn.onclick = () => {
+      if (safeIndex < total - 1) renderNgheBjtSection1Exercise(book, entries, safeIndex + 1);
+    };
+  }
+  if (toggleBookmarkBtn) {
+    toggleBookmarkBtn.onclick = () => {
+      bookmarked = !bookmarked;
+      setBjtCdBookmarked(book, "Section1", entry.orderNo, bookmarked);
       setCd1BookmarkBtnUI(toggleBookmarkBtn, bookmarked);
     };
   }
