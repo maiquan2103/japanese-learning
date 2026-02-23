@@ -610,7 +610,7 @@ async function renderNgheBjtCDFolders(book, cd) {
       row.className = "cd1FolderRow";
 
       const btn = document.createElement("button");
-      btn.className = "btn btnBjtCd";
+      btn.className = "btn btnBjtCd btnBjtFolderItem";
       btn.textContent = entry.label;
       btn.onclick = () => renderNgheBjtCDExercise(book, cd, entries, idx);
 

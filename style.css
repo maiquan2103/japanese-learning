@@ -58,6 +58,10 @@ body { margin: 0; background: #0b0e14; color: #e7eaf0; }
   text-align: center;
   padding: 22px 20px;
 }
+.btnBjtFolderItem {
+  font-size: 21px;
+  padding: 11px 20px;
+}
 .cd1FolderRow {
   display: flex;
   align-items: stretch;
