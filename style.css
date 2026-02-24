@@ -123,6 +123,42 @@ body { margin: 0; background: #0b0e14; color: #e7eaf0; }
 .row { display: flex; gap: 10px; flex-wrap: nowrap; margin-top: 12px; }
 .row .btnSmall { flex: 1 1 0; min-width: 0; text-align: center; white-space: nowrap; }
 .btnSmall { padding: 10px 12px; border-radius: 12px; border: 1px solid #2a3550; background: #172038; color: #e7eaf0; cursor: pointer; }
+.pmpInfoRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.pmpHiddenBlock { margin-top: 8px; }
+.pmpQuestionLine {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.pmpQuestionLine .sectionQuestionText {
+  flex: 1 1 auto;
+}
+.pmpInlineTranslateBtn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.pmpOptionRow {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+.pmpOptionBtn {
+  flex: 1 1 auto;
+  text-align: left;
+}
+.pmpOptionTranslateBtn {
+  flex: 0 0 90px;
+  min-width: 90px;
+}
+.pmpOptionTranslateBox {
+  margin-top: -2px;
+  margin-bottom: 4px;
+}
 
 .btnWrap { display: flex; align-items: stretch; gap: 8px; }
 .btnWrap .btn { flex: 1; }
