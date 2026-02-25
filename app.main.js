@@ -2,6 +2,7 @@
 const $ = (sel) => document.querySelector(sel);
 const view = $("#view");
 const btnHome = $("#btnHome");
+const LOCAL_PROGRESS_META_PREFIX = "kanji-quiz:progress-meta:";
 
 function shuffle(arr) {
   const a = arr.slice();
@@ -75,12 +76,17 @@ function keyBjtCdBookmark(accountId, book, cd, orderNo) {
   return `${STORAGE_KEY_BJT_CD_BOOKMARK}:${accountId || "guest"}:${book}:${cd}:${orderNo}`;
 }
 
+function keyProgressMeta(accountId) {
+  return `${LOCAL_PROGRESS_META_PREFIX}${accountId || "guest"}`;
+}
+
 function isBjtCdBookmarked(book, cd, orderNo) {
   return localStorage.getItem(keyBjtCdBookmark(state.accountId, book, cd, orderNo)) === "1";
 }
 
 function setBjtCdBookmarked(book, cd, orderNo, bookmarked) {
   localStorage.setItem(keyBjtCdBookmark(state.accountId, book, cd, orderNo), bookmarked ? "1" : "0");
+  markLocalProgressDirty(state.accountId);
   scheduleProgressSync();
 }
 
@@ -117,6 +123,7 @@ function getNextPartFile(mode, level, currentPartFile) {
 function setDone(mode, level, partFile, done) {
   if (!state.accountId) return;
   localStorage.setItem(keyDone(state.accountId, mode, level, partFile), done ? "1" : "0");
+  markLocalProgressDirty(state.accountId);
   scheduleProgressSync();
 }
 
@@ -132,7 +139,7 @@ async function loadJSON(path) {
 }
 
 function createEmptyProgress() {
-  return { done: {}, bookmarks: {} };
+  return { done: {}, bookmarks: {}, updatedAt: 0 };
 }
 
 function sanitizeProgress(raw) {
@@ -148,14 +155,44 @@ function sanitizeProgress(raw) {
       if (raw.bookmarks[k]) safe.bookmarks[k] = 1;
     }
   }
+  if (Number.isFinite(Number(raw.updatedAt))) {
+    safe.updatedAt = Number(raw.updatedAt);
+  }
   return safe;
 }
 
-function mergeProgress(a, b) {
-  return {
-    done: { ...(a?.done || {}), ...(b?.done || {}) },
-    bookmarks: { ...(a?.bookmarks || {}), ...(b?.bookmarks || {}) }
+function getLocalProgressMeta(accountId) {
+  if (!accountId) return { updatedAt: 0, dirty: false };
+  try {
+    const raw = localStorage.getItem(keyProgressMeta(accountId));
+    if (!raw) return { updatedAt: 0, dirty: false };
+    const parsed = JSON.parse(raw);
+    return {
+      updatedAt: Number(parsed?.updatedAt) || 0,
+      dirty: parsed?.dirty === true
+    };
+  } catch (_) {
+    return { updatedAt: 0, dirty: false };
+  }
+}
+
+function setLocalProgressMeta(accountId, meta) {
+  if (!accountId) return;
+  const safe = {
+    updatedAt: Number(meta?.updatedAt) || 0,
+    dirty: meta?.dirty === true
   };
+  localStorage.setItem(keyProgressMeta(accountId), JSON.stringify(safe));
+}
+
+function markLocalProgressDirty(accountId) {
+  if (!accountId) return;
+  setLocalProgressMeta(accountId, { updatedAt: Date.now(), dirty: true });
+}
+
+function isProgressEmpty(progress) {
+  if (!progress) return true;
+  return Object.keys(progress.done || {}).length === 0 && Object.keys(progress.bookmarks || {}).length === 0;
 }
 
 function readLocalProgress(accountId) {
@@ -177,6 +214,7 @@ function readLocalProgress(accountId) {
       out.bookmarks[key.slice(bookmarkPrefix.length)] = 1;
     }
   }
+  out.updatedAt = getLocalProgressMeta(accountId).updatedAt;
   return out;
 }
 
@@ -199,6 +237,10 @@ function applyProgressToLocalStorage(accountId, progress) {
   Object.keys(progress.bookmarks || {}).forEach((k) => {
     localStorage.setItem(`${bookmarkPrefix}${k}`, "1");
   });
+  setLocalProgressMeta(accountId, {
+    updatedAt: Number(progress?.updatedAt) || Date.now(),
+    dirty: false
+  });
 }
 
 async function fetchServerProgress(accountId) {
@@ -209,12 +251,15 @@ async function fetchServerProgress(accountId) {
 }
 
 async function pushServerProgress(accountId, progress) {
+  const payloadProgress = sanitizeProgress(progress);
+  payloadProgress.updatedAt = Number(payloadProgress.updatedAt) || Date.now();
   const res = await fetch(PROGRESS_API_PATH, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ accountId, data: sanitizeProgress(progress) })
+    body: JSON.stringify({ accountId, data: payloadProgress })
   });
   if (!res.ok) throw new Error(`progress_push_failed:${res.status}`);
+  setLocalProgressMeta(accountId, { updatedAt: payloadProgress.updatedAt, dirty: false });
 }
 
 async function syncAccountProgress(accountId) {
@@ -222,9 +267,20 @@ async function syncAccountProgress(accountId) {
   const local = readLocalProgress(accountId);
   try {
     const remote = await fetchServerProgress(accountId);
-    const merged = mergeProgress(local, remote);
-    applyProgressToLocalStorage(accountId, merged);
-    await pushServerProgress(accountId, merged);
+
+    // Boot/login sync: GET only, then select source by freshness.
+    if (isProgressEmpty(local) && !isProgressEmpty(remote)) {
+      applyProgressToLocalStorage(accountId, remote);
+      return;
+    }
+    if ((Number(remote.updatedAt) || 0) > (Number(local.updatedAt) || 0)) {
+      applyProgressToLocalStorage(accountId, remote);
+      return;
+    }
+    if ((Number(local.updatedAt) || 0) > (Number(remote.updatedAt) || 0)) {
+      setLocalProgressMeta(accountId, { updatedAt: local.updatedAt || Date.now(), dirty: true });
+      scheduleProgressSync();
+    }
   } catch (_) {}
 }
 
@@ -233,6 +289,8 @@ function scheduleProgressSync() {
   if (progressSyncTimer) clearTimeout(progressSyncTimer);
   progressSyncTimer = setTimeout(() => {
     progressSyncTimer = null;
+    const meta = getLocalProgressMeta(state.accountId);
+    if (!meta.dirty) return;
     const snapshot = readLocalProgress(state.accountId);
     pushServerProgress(state.accountId, snapshot).catch(() => {});
   }, SYNC_DEBOUNCE_MS);
