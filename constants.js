@@ -7,8 +7,12 @@ const DATA_BASE_URL = "https://raw.githubusercontent.com/maiquan2103/Japanese-fi
 const BJT_STUDY_BASE_PATH = `${DATA_BASE_URL}/bjt-study`;
 const CD_ANSWER_FALLBACK_FILES = ["list.json", "answers.json", "answer.json", "data.json"];
 const PMP_OWNER_ACCOUNT = "maiquan";
-const PMP_TESTA_DATA_URL = `${DATA_BASE_URL}/PMP/Knowledge%20areas/Project%20Integration%20Management/TestA.json`;
-const PMP_TESTA_MAX_QUESTIONS = 45;
+const PMP_TEST_MAX_QUESTIONS = 45;
+const PMP_TEST_DATA_URLS = {
+  "test-a": `${DATA_BASE_URL}/PMP/Knowledge%20areas/Project%20Integration%20Management/TestA.json`,
+  "test-b": `${DATA_BASE_URL}/PMP/Knowledge%20areas/Project%20Integration%20Management/TestB.json`,
+  "test-c": `${DATA_BASE_URL}/PMP/Knowledge%20areas/Project%20Integration%20Management/TestC.json`
+};
 const PMP_FOLDERS = [
   {
     id: "according-to-the-knowledge-areas",
@@ -25,6 +29,10 @@ const PMP_FOLDERS = [
           {
             id: "test-b",
             label: "TestB"
+          },
+          {
+            id: "test-c",
+            label: "TestC"
           }
         ]
       }

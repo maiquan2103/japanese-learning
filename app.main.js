@@ -386,6 +386,7 @@ const state = {
   currentChoices: null,
   currentCorrectIndex: null,
   pmpTestAQuestions: null,
+  pmpQuestionsByLeaf: {},
   resumeSession: null
 };
 

@@ -87,7 +87,7 @@ function renderPmpLeafFolder(parentFolder, leafFolder) {
     return;
   }
 
-  if (leafFolder.id === "test-a") {
+  if (getPmpLeafQuestionDataUrl(leafFolder?.id)) {
     renderPmpTestAList(parentFolder, leafFolder);
     return;
   }
@@ -450,7 +450,7 @@ function normalizePmpTestAEntries(raw) {
     .filter((x) => x.questionContent || x.options.length === 4)
     .sort((a, b) => a.number - b.number);
 
-  if (normalized.length) return normalized.slice(0, PMP_TESTA_MAX_QUESTIONS);
+  if (normalized.length) return normalized.slice(0, PMP_TEST_MAX_QUESTIONS);
 
   const fallbackObjects = collectObjectNodesDeep(raw, 500);
   const fallbackEntries = fallbackObjects
@@ -476,7 +476,7 @@ function normalizePmpTestAEntries(raw) {
       };
     })
     .filter((x) => x.questionContent)
-    .slice(0, PMP_TESTA_MAX_QUESTIONS);
+    .slice(0, PMP_TEST_MAX_QUESTIONS);
 
   return fallbackEntries;
 }
@@ -497,14 +497,37 @@ function formatPmpWhyWrong(value) {
   return formatMultilineText(String(value));
 }
 
-async function loadPmpTestAQuestions() {
-  if (Array.isArray(state.pmpTestAQuestions) && state.pmpTestAQuestions.length) {
-    return state.pmpTestAQuestions;
+function getPmpLeafQuestionDataUrl(leafId) {
+  if (!leafId) return "";
+  return PMP_TEST_DATA_URLS[leafId] || "";
+}
+
+function getPmpLeafLabel(leafFolder) {
+  return leafFolder?.label || leafFolder?.id || "Test";
+}
+
+async function loadPmpTestAQuestions(leafFolder) {
+  const leafId = leafFolder?.id || "test-a";
+  const cached = state.pmpQuestionsByLeaf?.[leafId];
+  if (Array.isArray(cached) && cached.length) {
+    return cached;
   }
 
-  const raw = await loadJSON(PMP_TESTA_DATA_URL);
+  const dataUrl = getPmpLeafQuestionDataUrl(leafId);
+  if (!dataUrl) return [];
+
+  const raw = await loadJSON(dataUrl);
   const entries = normalizePmpTestAEntries(raw);
-  state.pmpTestAQuestions = entries.length ? entries : null;
+
+  if (!state.pmpQuestionsByLeaf || typeof state.pmpQuestionsByLeaf !== "object") {
+    state.pmpQuestionsByLeaf = {};
+  }
+  state.pmpQuestionsByLeaf[leafId] = entries.length ? entries : null;
+
+  if (leafId === "test-a") {
+    state.pmpTestAQuestions = entries.length ? entries : null;
+  }
+
   return entries;
 }
 
@@ -530,7 +553,7 @@ async function renderPmpTestAList(parentFolder, leafFolder) {
         <h1 class="h1">${leafFolder.label}</h1>
         <button class="btnSmall" id="backToPmpChild">←</button>
       </div>
-      <p class="sub">Dang tai du lieu 45 cau hoi...</p>
+      <p class="sub">Dang tai du lieu ${PMP_TEST_MAX_QUESTIONS} cau hoi...</p>
       <div class="grid grid2" id="pmpTestAList"></div>
     </div>
   `;
@@ -546,7 +569,7 @@ async function renderPmpTestAList(parentFolder, leafFolder) {
 
   const box = $("#pmpTestAList");
   try {
-    const entries = await loadPmpTestAQuestions();
+    const entries = await loadPmpTestAQuestions(leafFolder);
     document.querySelector(".sub").textContent = entries.length
       ? `Hien thi ${entries.length} cau hoi.`
       : "Khong co du lieu cau hoi hop le.";
@@ -577,7 +600,7 @@ async function renderPmpTestAList(parentFolder, leafFolder) {
       box.appendChild(row);
     });
   } catch (_) {
-    document.querySelector(".sub").textContent = "Khong tai duoc du lieu TestA.json.";
+    document.querySelector(".sub").textContent = `Khong tai duoc du lieu ${getPmpLeafLabel(leafFolder)}.json.`;
   }
 }
 
