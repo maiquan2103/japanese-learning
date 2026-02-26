@@ -3,6 +3,7 @@ const $ = (sel) => document.querySelector(sel);
 const view = $("#view");
 const btnHome = $("#btnHome");
 const LOCAL_PROGRESS_META_PREFIX = "kanji-quiz:progress-meta:";
+const LOCAL_IN_PROGRESS_PREFIX = "kanji-quiz:in-progress:";
 
 function shuffle(arr) {
   const a = arr.slice();
@@ -80,6 +81,10 @@ function keyProgressMeta(accountId) {
   return `${LOCAL_PROGRESS_META_PREFIX}${accountId || "guest"}`;
 }
 
+function keyInProgress(accountId) {
+  return `${LOCAL_IN_PROGRESS_PREFIX}${accountId || "guest"}`;
+}
+
 function isBjtCdBookmarked(book, cd, orderNo) {
   return localStorage.getItem(keyBjtCdBookmark(state.accountId, book, cd, orderNo)) === "1";
 }
@@ -138,8 +143,67 @@ async function loadJSON(path) {
   return await res.json();
 }
 
+function shouldTrackQuizInProgress(mode, partFile) {
+  return (mode === "vocab" || mode === "kanji") && String(partFile || "").toLowerCase() === "all.json";
+}
+
+function sanitizeInProgressSession(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const mode = raw.mode === "vocab" || raw.mode === "kanji" ? raw.mode : null;
+  const level = typeof raw.level === "string" ? raw.level : "";
+  const partFile = typeof raw.partFile === "string" ? raw.partFile : "";
+  const idx = Number(raw.idx);
+  const orderRaw = Array.isArray(raw.order) ? raw.order : null;
+
+  if (!mode || !level || !shouldTrackQuizInProgress(mode, partFile)) return null;
+  if (!Number.isInteger(idx) || idx < 0) return null;
+  if (!orderRaw || orderRaw.length === 0) return null;
+
+  const order = [];
+  for (const n of orderRaw) {
+    const v = Number(n);
+    if (!Number.isInteger(v) || v < 0) return null;
+    order.push(v);
+  }
+
+  return {
+    mode,
+    level,
+    partFile,
+    idx,
+    order,
+    updatedAt: Number(raw.updatedAt) || 0
+  };
+}
+
+function getInProgressSession(accountId) {
+  if (!accountId) return null;
+  try {
+    return sanitizeInProgressSession(JSON.parse(localStorage.getItem(keyInProgress(accountId)) || "null"));
+  } catch (_) {
+    return null;
+  }
+}
+
+function setInProgressSession(accountId, session) {
+  if (!accountId) return;
+  const safe = sanitizeInProgressSession(session);
+  if (!safe) {
+    localStorage.removeItem(keyInProgress(accountId));
+    state.resumeSession = null;
+    markLocalProgressDirty(accountId);
+    scheduleProgressSync();
+    return;
+  }
+  safe.updatedAt = Date.now();
+  localStorage.setItem(keyInProgress(accountId), JSON.stringify(safe));
+  state.resumeSession = safe;
+  markLocalProgressDirty(accountId);
+  scheduleProgressSync();
+}
+
 function createEmptyProgress() {
-  return { done: {}, bookmarks: {}, updatedAt: 0 };
+  return { done: {}, bookmarks: {}, inProgress: null, updatedAt: 0 };
 }
 
 function sanitizeProgress(raw) {
@@ -155,6 +219,7 @@ function sanitizeProgress(raw) {
       if (raw.bookmarks[k]) safe.bookmarks[k] = 1;
     }
   }
+  safe.inProgress = sanitizeInProgressSession(raw.inProgress);
   if (Number.isFinite(Number(raw.updatedAt))) {
     safe.updatedAt = Number(raw.updatedAt);
   }
@@ -192,7 +257,11 @@ function markLocalProgressDirty(accountId) {
 
 function isProgressEmpty(progress) {
   if (!progress) return true;
-  return Object.keys(progress.done || {}).length === 0 && Object.keys(progress.bookmarks || {}).length === 0;
+  return (
+    Object.keys(progress.done || {}).length === 0 &&
+    Object.keys(progress.bookmarks || {}).length === 0 &&
+    !progress.inProgress
+  );
 }
 
 function readLocalProgress(accountId) {
@@ -214,6 +283,7 @@ function readLocalProgress(accountId) {
       out.bookmarks[key.slice(bookmarkPrefix.length)] = 1;
     }
   }
+  out.inProgress = getInProgressSession(accountId);
   out.updatedAt = getLocalProgressMeta(accountId).updatedAt;
   return out;
 }
@@ -237,6 +307,12 @@ function applyProgressToLocalStorage(accountId, progress) {
   Object.keys(progress.bookmarks || {}).forEach((k) => {
     localStorage.setItem(`${bookmarkPrefix}${k}`, "1");
   });
+  if (progress.inProgress) {
+    localStorage.setItem(keyInProgress(accountId), JSON.stringify(progress.inProgress));
+  } else {
+    localStorage.removeItem(keyInProgress(accountId));
+  }
+  state.resumeSession = sanitizeInProgressSession(progress.inProgress);
   setLocalProgressMeta(accountId, {
     updatedAt: Number(progress?.updatedAt) || Date.now(),
     dirty: false
@@ -309,7 +385,8 @@ const state = {
   locked: false,
   currentChoices: null,
   currentCorrectIndex: null,
-  pmpTestAQuestions: null
+  pmpTestAQuestions: null,
+  resumeSession: null
 };
 
 btnHome.addEventListener("click", () => routeToHome());
@@ -321,6 +398,7 @@ function logout() {
     progressSyncTimer = null;
   }
   state.accountId = null;
+  state.resumeSession = null;
   localStorage.removeItem(STORAGE_KEY_ACCOUNT);
   updateTopbar(false);
   renderLogin();

@@ -101,7 +101,13 @@ function renderParts(mode, level) {
       <button class="btnReset" type="button" title="Reset phần này">↺</button>
     `;
 
-    wrap.querySelector(".btnPart").onclick = () => startGame(mode, level, file);
+    wrap.querySelector(".btnPart").onclick = () => {
+      if (String(file || "").toLowerCase() === "all.json") {
+        showResumePopupForAllIfNeeded(mode, level);
+        return;
+      }
+      startGame(mode, level, file);
+    };
 
     const doneBtn = wrap.querySelector(".btnDone");
     if (doneBtn) {
@@ -120,9 +126,91 @@ function renderParts(mode, level) {
 
     box.appendChild(wrap);
   });
+
 }
 
-async function startGame(mode, level, partFile) {
+function isValidResumeOrder(order, total) {
+  if (!Array.isArray(order) || order.length !== total) return false;
+  const seen = new Set();
+  for (const n of order) {
+    if (!Number.isInteger(n) || n < 0 || n >= total || seen.has(n)) return false;
+    seen.add(n);
+  }
+  return seen.size === total;
+}
+
+function saveCurrentQuizInProgress() {
+  if (!state.accountId) return;
+  if (!shouldTrackQuizInProgress(state.mode, state.partFile)) return;
+  if (!Array.isArray(state.order) || state.order.length === 0) return;
+  if (!Number.isInteger(state.idx) || state.idx < 0 || state.idx >= state.order.length) return;
+
+  setInProgressSession(state.accountId, {
+    mode: state.mode,
+    level: state.level,
+    partFile: state.partFile,
+    idx: state.idx,
+    order: state.order
+  });
+}
+
+function clearCurrentQuizInProgress() {
+  if (!state.accountId) return;
+  setInProgressSession(state.accountId, null);
+}
+
+function showResumePopupForAllIfNeeded(mode, level) {
+  const resume = getInProgressSession(state.accountId);
+  if (!resume || resume.mode !== mode || resume.level !== level || String(resume.partFile || "").toLowerCase() !== "all.json") {
+    startGame(mode, level, "all.json");
+    return;
+  }
+  if (!Number.isInteger(resume.idx) || resume.idx <= 0) {
+    startGame(mode, level, "all.json", resume);
+    return;
+  }
+
+  const overlay = document.createElement("div");
+  overlay.style.position = "fixed";
+  overlay.style.inset = "0";
+  overlay.style.background = "rgba(0,0,0,0.45)";
+  overlay.style.display = "flex";
+  overlay.style.alignItems = "center";
+  overlay.style.justifyContent = "center";
+  overlay.style.padding = "16px";
+  overlay.style.zIndex = "9999";
+
+  const card = document.createElement("div");
+  card.className = "card";
+  card.style.maxWidth = "420px";
+  card.style.width = "100%";
+  card.innerHTML = `
+    <h2 class="h1" style="margin-bottom:8px;">Bạn đang học dở</h2>
+    <p class="sub" style="margin-bottom:14px;">${resume.mode === "vocab" ? "Từ vựng" : "Chữ Hán"} / ${resume.level} / ${partFileToLabel("all.json", resume.mode)}</p>
+    <div class="row">
+      <button class="btnSmall" id="resumeRestart">Học lại từ đầu</button>
+      <button class="btnSmall" id="resumeContinue">Học tiếp</button>
+    </div>
+  `;
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+
+  card.querySelector("#resumeRestart").onclick = () => {
+    overlay.remove();
+    clearCurrentQuizInProgress();
+    startGame(mode, level, "all.json");
+  };
+
+  card.querySelector("#resumeContinue").onclick = () => {
+    overlay.remove();
+    startGame(mode, level, "all.json", resume);
+  };
+}
+
+async function startGame(mode, level, partFile, resumeSession = null) {
+  if (!shouldTrackQuizInProgress(mode, partFile)) {
+    clearCurrentQuizInProgress();
+  }
   state.mode = mode;
   state.level = level;
   state.partFile = partFile;
@@ -133,7 +221,24 @@ async function startGame(mode, level, partFile) {
   const items = await loadJSON(path);
 
   state.questions = items;
-  state.order = shuffle([...Array(items.length).keys()]);
+  const canResumeThisSession =
+    resumeSession &&
+    resumeSession.mode === mode &&
+    resumeSession.level === level &&
+    String(resumeSession.partFile || "").toLowerCase() === String(partFile || "").toLowerCase() &&
+    isValidResumeOrder(resumeSession.order, items.length) &&
+    Number.isInteger(resumeSession.idx) &&
+    resumeSession.idx >= 0 &&
+    resumeSession.idx < items.length;
+
+  if (canResumeThisSession) {
+    state.order = resumeSession.order.slice();
+    state.idx = resumeSession.idx;
+  } else {
+    state.order = shuffle([...Array(items.length).keys()]);
+    state.idx = 0;
+  }
+  saveCurrentQuizInProgress();
   renderQuestion();
 }
 
@@ -242,9 +347,11 @@ function onAnswer(isCorrect, chosenIndex, correctIndex) {
       state.locked = false;
 
       if (state.idx >= state.order.length) {
+        clearCurrentQuizInProgress();
         setDone(state.mode, state.level, state.partFile, true);
         renderFinish();
       } else {
+        saveCurrentQuizInProgress();
         renderQuestion();
       }
     }, state.mode === "kanji" ? 1000 : 2000);

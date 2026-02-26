@@ -16,3 +16,7 @@ Frontend script order in index.html:
 4. app.bjt.js
 5. app.quiz.js
 6. app.boot.js
+
+
+python -m http.server 8000
+http://localhost:8000
