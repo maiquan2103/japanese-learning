@@ -16,6 +16,15 @@ function shuffle(arr) {
 
 let progressSyncTimer = null;
 
+function loadStoredQuizWaitSeconds() {
+  const raw = Number(localStorage.getItem(STORAGE_KEY_QUIZ_WAIT_SECONDS));
+  return [0.5, 1, 1.5, 2, 2.5, 3].includes(raw) ? raw : 2;
+}
+
+function loadStoredQuizShowProgress() {
+  return localStorage.getItem(STORAGE_KEY_QUIZ_SHOW_PROGRESS) === "1";
+}
+
 
 function getCdAnswerBaseCandidatePaths(book, cd) {
   return [
@@ -385,6 +394,8 @@ const state = {
   locked: false,
   currentChoices: null,
   currentCorrectIndex: null,
+  quizWaitSeconds: loadStoredQuizWaitSeconds(),
+  quizShowProgress: loadStoredQuizShowProgress(),
   pmpTestAQuestions: null,
   pmpQuestionsByLeaf: {},
   resumeSession: null

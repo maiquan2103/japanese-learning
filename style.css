@@ -105,6 +105,25 @@ body { margin: 0; background: #0b0e14; color: #e7eaf0; }
   text-align: center;
 }
 .questionCenter .questionMeta { margin-bottom: 16px; }
+.questionCenter .questionMetaTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  text-align: left;
+}
+.questionCenter .questionMetaText {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.questionCenter .questionTools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+}
 .questionCenter .bigQ {
   font-size: 44px;
   font-weight: 800;
@@ -136,6 +155,49 @@ body { margin: 0; background: #0b0e14; color: #e7eaf0; }
 .row { display: flex; gap: 10px; flex-wrap: nowrap; margin-top: 12px; }
 .row .btnSmall { flex: 1 1 0; min-width: 0; text-align: center; white-space: nowrap; }
 .btnSmall { padding: 10px 12px; border-radius: 12px; border: 1px solid #2a3550; background: #172038; color: #e7eaf0; cursor: pointer; }
+.btnTiny {
+  padding: 7px 10px;
+  border-radius: 10px;
+  border: 1px solid #2a3550;
+  background: #172038;
+  color: #e7eaf0;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.waitPicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  border: 1px solid #2a3550;
+  background: #172038;
+  color: #e7eaf0;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.waitSelect {
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #e7eaf0;
+  font: inherit;
+  cursor: pointer;
+}
+.waitSelect option {
+  color: #e7eaf0;
+  background: #172038;
+}
+@media (max-width: 640px) {
+  .questionCenter .questionMetaTop {
+    flex-direction: column;
+  }
+  .questionCenter .questionTools {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
 .pmpHiddenBlock { margin-top: 8px; }
 .pmpQuestionLine {
   display: flex;

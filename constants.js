@@ -1,5 +1,7 @@
 ﻿const STORAGE_KEY_ACCOUNT = "kanji-quiz:currentAccount";
 const STORAGE_KEY_BJT_CD_BOOKMARK = "kanji-quiz:bjt-cd:bookmark";
+const STORAGE_KEY_QUIZ_WAIT_SECONDS = "kanji-quiz:wait-seconds";
+const STORAGE_KEY_QUIZ_SHOW_PROGRESS = "kanji-quiz:show-progress";
 const PROGRESS_API_BASE_URL = String(globalThis.__PROGRESS_API_BASE_URL || "").trim().replace(/\/+$/, "");
 const PROGRESS_API_PATH = PROGRESS_API_BASE_URL ? `${PROGRESS_API_BASE_URL}/api/progress` : "/api/progress";
 const SYNC_DEBOUNCE_MS = 800;

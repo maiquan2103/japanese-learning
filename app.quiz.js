@@ -257,6 +257,16 @@ function buildChoices(correctItem, poolItems) {
   return { choices, correctIndex };
 }
 
+function setQuizWaitSeconds(seconds) {
+  state.quizWaitSeconds = seconds;
+  localStorage.setItem(STORAGE_KEY_QUIZ_WAIT_SECONDS, String(seconds));
+}
+
+function setQuizShowProgress(show) {
+  state.quizShowProgress = !!show;
+  localStorage.setItem(STORAGE_KEY_QUIZ_SHOW_PROGRESS, show ? "1" : "0");
+}
+
 function renderQuestion(feedback = null) {
   const total = state.order.length;
   const qIndex = state.order[state.idx];
@@ -281,9 +291,20 @@ function renderQuestion(feedback = null) {
   view.innerHTML = `
     <div class="card">
       <div class="questionCenter">
-        <div class="questionMeta">
-          <div class="sub">${state.mode === "vocab" ? "Từ vựng" : "Chữ Hán"} / ${state.level} / ${partLabel}</div>
-          <div class="progress">Câu ${state.idx + 1} / ${total}</div>
+        <div class="questionMeta questionMetaTop">
+          <div class="questionMetaText">
+            <div class="sub">${state.mode === "vocab" ? "Từ vựng" : "Chữ Hán"} / ${state.level} / ${partLabel}</div>
+            ${state.quizShowProgress ? `<div class="progress">Câu ${state.idx + 1} / ${total}</div>` : ""}
+          </div>
+          <div class="questionTools">
+            <button class="btnTiny" id="toggleProgress" type="button">${state.quizShowProgress ? "Ẩn số câu" : "Hiện số câu"}</button>
+            <label class="waitPicker" for="waitSeconds">
+              <span>Đợi</span>
+              <select id="waitSeconds" class="waitSelect">
+                ${[0.5, 1, 1.5, 2, 2.5, 3].map((seconds) => `<option value="${seconds}" ${seconds === state.quizWaitSeconds ? "selected" : ""}>${seconds}s</option>`).join("")}
+              </select>
+            </label>
+          </div>
         </div>
         <div class="bigQ">${escapeHtml(item.question)}</div>
         ${feedback && state.mode !== "kanji" ? `<div class="answer1Reveal">${escapeHtml(item.answer1)}</div>` : ""}
@@ -302,6 +323,14 @@ function renderQuestion(feedback = null) {
       </div>
     </div>
   `;
+
+  $("#toggleProgress").onclick = () => {
+    setQuizShowProgress(!state.quizShowProgress);
+    renderQuestion(feedback);
+  };
+  $("#waitSeconds").onchange = (e) => {
+    setQuizWaitSeconds(Number(e.target.value) || 2);
+  };
 
   if (feedback && !feedback.ok) {
     $("#retry").onclick = () => startGame(state.mode, state.level, state.partFile);
@@ -354,7 +383,7 @@ function onAnswer(isCorrect, chosenIndex, correctIndex) {
         saveCurrentQuizInProgress();
         renderQuestion();
       }
-    }, state.mode === "kanji" ? 1000 : 2000);
+    }, state.quizWaitSeconds * 1000);
   } else {
     renderQuestion({ ok: false, chosenIndex, correctIndex });
   }
