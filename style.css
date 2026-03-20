@@ -110,11 +110,15 @@ body { margin: 0; background: #0b0e14; color: #e7eaf0; }
   justify-content: space-between;
   align-items: flex-start;
   gap: 12px;
+  flex-wrap: nowrap;
   text-align: left;
 }
 .questionCenter .questionMetaText {
   flex: 1 1 auto;
   min-width: 0;
+}
+.questionCenter .questionMetaText .sub {
+  margin-bottom: 0;
 }
 .questionCenter .questionTools {
   display: flex;
@@ -191,15 +195,6 @@ body { margin: 0; background: #0b0e14; color: #e7eaf0; }
 .waitSelect option {
   color: #e7eaf0;
   background: #172038;
-}
-@media (max-width: 640px) {
-  .questionCenter .questionMetaTop {
-    flex-direction: column;
-  }
-  .questionCenter .questionTools {
-    width: 100%;
-    justify-content: flex-end;
-  }
 }
 .pmpHiddenBlock { margin-top: 8px; }
 .pmpQuestionLine {
