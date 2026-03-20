@@ -297,9 +297,8 @@ function renderQuestion(feedback = null) {
             ${state.quizShowProgress ? `<div class="progress">Câu ${state.idx + 1} / ${total}</div>` : ""}
           </div>
           <div class="questionTools">
-            <button class="btnTiny" id="toggleProgress" type="button">${state.quizShowProgress ? "Ẩn số câu" : "Hiện số câu"}</button>
-            <label class="waitPicker" for="waitSeconds">
-              <span>Đợi</span>
+            <button class="btnTiny" id="toggleProgress" type="button">${state.quizShowProgress ? "Ẩn" : "Hiện"}</button>
+            <label class="waitPicker" for="waitSeconds" aria-label="Thời gian đợi">
               <select id="waitSeconds" class="waitSelect">
                 ${[0.5, 1, 1.5, 2, 2.5, 3].map((seconds) => `<option value="${seconds}" ${seconds === state.quizWaitSeconds ? "selected" : ""}>${seconds}s</option>`).join("")}
               </select>

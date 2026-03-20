@@ -120,9 +120,9 @@ body { margin: 0; background: #0b0e14; color: #e7eaf0; }
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 6px;
   flex: 0 0 auto;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 .questionCenter .bigQ {
   font-size: 44px;
@@ -156,25 +156,27 @@ body { margin: 0; background: #0b0e14; color: #e7eaf0; }
 .row .btnSmall { flex: 1 1 0; min-width: 0; text-align: center; white-space: nowrap; }
 .btnSmall { padding: 10px 12px; border-radius: 12px; border: 1px solid #2a3550; background: #172038; color: #e7eaf0; cursor: pointer; }
 .btnTiny {
-  padding: 7px 10px;
-  border-radius: 10px;
+  padding: 6px 9px;
+  border-radius: 9px;
   border: 1px solid #2a3550;
   background: #172038;
   color: #e7eaf0;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
+  line-height: 1.2;
   white-space: nowrap;
 }
 .waitPicker {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 10px;
-  border-radius: 10px;
+  justify-content: center;
+  padding: 5px 8px;
+  border-radius: 9px;
   border: 1px solid #2a3550;
   background: #172038;
   color: #e7eaf0;
-  font-size: 13px;
+  font-size: 12px;
+  line-height: 1.2;
   white-space: nowrap;
 }
 .waitSelect {
@@ -184,6 +186,7 @@ body { margin: 0; background: #0b0e14; color: #e7eaf0; }
   color: #e7eaf0;
   font: inherit;
   cursor: pointer;
+  padding-right: 2px;
 }
 .waitSelect option {
   color: #e7eaf0;
@@ -195,7 +198,7 @@ body { margin: 0; background: #0b0e14; color: #e7eaf0; }
   }
   .questionCenter .questionTools {
     width: 100%;
-    justify-content: flex-start;
+    justify-content: flex-end;
   }
 }
 .pmpHiddenBlock { margin-top: 8px; }
